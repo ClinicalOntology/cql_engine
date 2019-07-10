@@ -192,9 +192,13 @@ public class Context {
     public boolean enterLibrary(String libraryName) {
         if (libraryName != null) {
             IncludeDef includeDef = resolveLibraryRef(libraryName);
-            Library library = resolveIncludeDef(includeDef);
-            currentLibrary.push(library);
-            return true;
+            if(includeDef != null) {
+                Library library = resolveIncludeDef(includeDef);
+                currentLibrary.push(library);
+                return true;
+            } else {
+                return false;
+            }
         }
 
         return false;
@@ -217,10 +221,15 @@ public class Context {
     }
 
     private IncludeDef resolveLibraryRef(String libraryName) {
-        for (IncludeDef includeDef : getCurrentLibrary().getIncludes().getDef()) {
-            if (includeDef.getLocalIdentifier().equals(libraryName)) {
-                return includeDef;
+        Library.Includes includes = getCurrentLibrary().getIncludes();
+        if(includes != null && includes.getDef() != null) {
+            for (IncludeDef includeDef : includes.getDef()) {
+                if (includeDef.getLocalIdentifier().equals(libraryName)) {
+                    return includeDef;
+                }
             }
+        } else {
+            return null;
         }
 
         throw new IllegalArgumentException(String.format("Could not resolve library reference '%s'.", libraryName));
@@ -448,7 +457,7 @@ public class Context {
     public Object resolveParameterRef(String libraryName, String name) {
         boolean enteredLibrary = enterLibrary(libraryName);
         try {
-            String fullName = libraryName != null ? String.format("%s.%s", getCurrentLibrary().getIdentifier().getId(), name) : name;
+            String fullName = libraryName != null ? String.format("%s.%s", libraryName, name) : String.format("%s.%s", getCurrentLibrary().getIdentifier().getId(), name);//TODO cjkn - modified
             if (parameters.containsKey(fullName)) {
                 return parameters.get(fullName);
             }
@@ -511,6 +520,15 @@ public class Context {
     public void registerDataProvider(String modelUri, DataProvider dataProvider) {
         dataProviders.put(modelUri, dataProvider);
         packageMap.put(dataProvider.getPackageName(), dataProvider);
+    }
+
+    public void registerDataProvider(String modelUri, List<String> packageNames, DataProvider dataProvider) {//A provider may service multiple packages. It is not a 1:1 relationship.
+        this.dataProviders.put(modelUri, dataProvider);
+        if(packageNames != null) {
+            packageNames.forEach(packageName -> {
+                this.packageMap.put(packageName, dataProvider);
+            });
+        }
     }
 
     public DataProvider resolveDataProvider(QName dataType) {
